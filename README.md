@@ -1,0 +1,2 @@
+# IntroAI_Assignment02
+人工智能导论课程第二次作业使用到的代码
