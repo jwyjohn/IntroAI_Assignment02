@@ -1,0 +1,173 @@
+%!TEX program = xelatex
+%!BIB program = bibtex
+
+\documentclass[cn,black,10pt,normal]{elegantnote}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+
+\lstset{%
+basicstyle=\linespread{0.8}\tt,
+frame=single, %把代码用带有阴影的框圈起来
+breaklines=true, %对过长的代码自动换行
+}
+
+\newcommand{\setParDef}{\setlength {\parskip} {0pt} }
+\newcommand{\upcite}[1]{\textsuperscript{\textsuperscript{\cite{#1}}}}
+
+\title{实验报告\\ \normalsize 在Fashion-MNIST数据集上复现神经网络的学习流程}
+\author{学号：1951510 \hspace{30pt} 姓名：姜文渊}
+\institute{Tongji University}
+%\version{0.01}
+% \date{\zhtoday}
+\date{2022 年4 月13 日}
+\begin{document}
+\setParDef
+\maketitle
+
+本次实验的代码托管在GitHub上，见\url{https://github.com/jwyjohn/IntroAI_Assignment02}，故具体代码不再附在文中。
+
+\section{实验背景}
+
+\paragraph{实验目的}前几次课上介绍了神经网络训练的详细的数学原理和常用深度学习框架的使用方法，本次实验企图在老师推荐的Fashion-MNIST数据集上，实操复现神经网络的学习流程，以期熟悉训练神经网络的大体流程，并加深对深度学习的理解。
+
+\paragraph{实验概览}本文大致分为以下几个部分：
+\begin{enumerate}
+    \item 实验原理的简介
+    \item 实验环境配置
+    \item 数据集的准备
+    \item 全连接神经网络结构的搭建
+    \item 训练与测试
+    \item 性能比较与分析
+    \item 实验小结
+\end{enumerate}
+
+\section{实验原理}
+
+实验原理部分主要列举全连接神经网络的前向传播和反向传播的矩阵形式的公式，而关于全连接神经网络（多层感知机）的简介，以及公式和原理的推导，在课程中已经较为完备，这里就不再赘述了。
+
+\paragraph{前向传播过程}
+\begin{equation}
+    \begin{aligned} \begin{cases} \boldsymbol{z^{(l)}=w^{(l)}a^{(l-1)}+b}\\ \boldsymbol{a^{(l)}}=\sigma(\boldsymbol{z^{(l)}}) \end{cases} \end{aligned}
+\end{equation}
+
+
+\paragraph{计算输出层误差}
+\begin{equation}
+    \boldsymbol{\delta^{(L)}}=\nabla_{\boldsymbol{a^{(L)}}}\boldsymbol{C(\theta)}\odot\boldsymbol{\sigma'(z^{(L)})}
+\end{equation}
+
+\paragraph{计算反向传播误差}
+\begin{equation}
+    \boldsymbol{\delta^{(l)}}=\left((\boldsymbol{w^{(l+1)}})^T\boldsymbol{\delta^{(l+1)}}\right)\odot\sigma'(\boldsymbol{z^{(l)}})
+\end{equation}
+
+\paragraph{计算并且更新权重}
+\begin{equation}
+    \begin{aligned} \begin{cases} w_{jk}^{(l)}:=w_{jk}^{(l)}-\alpha\dfrac{\partial C(\theta)}{\partial w_{jk}^{(l)}}\\ b_j^{(l)}:=b_j^{(l)}-\alpha\dfrac{\partial C(\theta)}{\partial b_j^{(l)}} \end{cases} \end{aligned}
+\end{equation}
+
+\section{实验环境}
+
+\paragraph{硬件环境} 本次实验使用的是x86兼容机。具体配置如下：
+\begin{itemize}
+    \item CPU: i7-11800H 8C16T @2.40GHz, Max TDP 35W
+    \item RAM: 8Gx2 DDR4 2400MHz with XMP
+    \item GPU: RTX 3060 Laptop, Max TDP 65W
+\end{itemize}
+
+\paragraph{深度学习框架} 本次实验使用的深度学习框架为PyTorch，与课上使用的Keras不同。Pytorch是由Facebook的人工智能研究小组开发的深度学习框架。与Keras一样，它也抽象出了深层网络编程的许多混乱部分。就高级和低级代码风格而言，Pytorch介于Keras和TensorFlow之间。比起Keras具有更大的灵活性和控制能力，但同时又不必进行任何复杂的声明式编程。\upcite{pytrc}
+
+选择使用PyTorch的原因除了其被广泛应用于深度学习相关的研究中，更多的考量在于，框架本身只是算法的载体，通过使用于课上不同的框架实现相同的神经网络的训练于测试流程，可以更好地熟悉深度学习的原理以及现代深度学习的框架。
+
+\paragraph{集成开发环境} 为方便PyTorch的实时调试，笔者采用的开发环境为Jupyter Notebook。事实上，任何Python的开发环境都是合理的。
+
+\section{实验过程}
+
+\subsection{环境配置} 由于环境配置不是本次实验的重点，故这里只大致说明环境配置的流程，具体笔者使用的环境详见开头处笔者的GitHub库中的\lstinline{requirements.txt}。
+\begin{enumerate}
+    \item 安装\textbf{非最新版本的}显卡驱动
+    \item 从TUNA镜像站下载Miniconda安装包并安装
+    \item 配置conda的镜像站和pypi的镜像站
+    \item 使用conda创建PyTorch GPU的环境，并安装对应的软件包
+\end{enumerate}
+
+\subsection{数据集准备}
+本次实验使用的数据集为Fashion-MNIST\upcite{xiao2017fashion}，其除了内容与经典的MNIST数据集不同外，其它参数都保持与MNIST数据集相同。例如，图像均为\lstinline{28x28}的\lstinline{8bit}灰度图，分类均为10类。
+\paragraph{数据集下载} 将\url{https://github.com/zalandoresearch/fashion-mnist/tree/master/data/fashion}中到本地，其中的四个\lstinline{*.gz}文件解压后即为数据集。值得注意的是，在国内使用PyTorch中的\lstinline{torch.utils.data.DataLoader}和\lstinline{torchvision.datasets.FashionMNIST}加载该数据集时，PyTorch会自动从网上下载这些文件。因为国内互联网的种种特性，下载大多数时候会失败，此时终止该处程序的执行，将前面下载好的四个\lstinline{*.gz}拷贝到四个\lstinline{raw}目录下，再次运行时即可成功载入数据集。
+
+\textbf{此外，还可以在载入数据时对数据集进行Normalization和数据集增广，从而使得后面的训练获得更好的效果。}
+
+\paragraph{数据集划分} 一般来说，训练神经网络需要自行划分数据集，但Fashion-MNIST已经将训练集和测试集划分，故无需我们自己动手划分了。
+
+\subsection{神经网络结构搭建}
+和Keras类似，在PyTorch中，我们可以通过继承\lstinline{nn.Module}类，将\lstinline{self.model}设为一个拥有多层的\lstinline{nn.Sequential}模型，并保证每一层的输入输出尺寸相匹配，即可完成模型的创建。例如创建一个多层的使用\lstinline{LeakyReLU}作为激活函数的模型，可由下面十几行代码完成构建。
+\begin{lstlisting}
+class fcNet(nn.Module):
+    def __init__(self):
+        super(fcNet, self).__init__()
+        self.model = nn.Sequential(
+            nn.Linear(784, 200),
+            nn.LeakyReLU(inplace=True),
+            nn.Linear(200, 200),
+            nn.LeakyReLU(inplace=True),
+            nn.Linear(200, 10),
+            nn.Sigmoid(),
+            nn.LogSoftmax()
+        )
+    def forward(self, x):
+        x = self.model(x)
+        return x
+\end{lstlisting}
+
+
+\subsection{训练与测试}
+
+\paragraph{参数设置} 得益于Python灵活的语法和Jupyter灵活的调试方法，我们的一些超参数，例如\lstinline{batch_size}，\lstinline{learning_rate}，\lstinline{momentum}等，可以根据训练的效果随时调整。
+
+\paragraph{训练过程} 训练前需要先指定优化器，例如\lstinline{SGD}、\lstinline{Adam}等。由于训练是在GPU上进行，故而需要将模型和数据利用\lstinline{.to(device)}方法存放到显存中进行训练。受限于RTX3060 Laptop的显存大小，模型的规模和\lstinline{batch_size}都不能过大。长时间挂机训练时，注意兼容机的散热和供电，并需要配置好操作系统使之不会进入休眠状态。为了防止训练意外停止，每一个epoch之后，训练后的网络都会进行一次保存，且训练的loss和accuracy都会记录在log中备查。
+\begin{lstlisting}
+def train(epoch):
+    network.train()
+    for batch_idx, (data, target) in enumerate(train_loader):
+        optimizer.zero_grad()
+        data = data.view(-1, 28*28)
+        output = network(data.to(device))
+        loss = F.nll_loss(output, target.to(device)) # 计算loss
+        loss.backward() # 反向传播
+        optimizer.step() # 更新权值
+        ...... # logging与保存模型
+\end{lstlisting}
+
+\section{性能分析与比较} 我们在Fashion-MNIST的任务中，主要关注的有以下几点指标：1）模型的准确率；2）训练模型所花费的epoch数；3）模型的规模。
+
+除了训练的全连接神经网络外，笔者也尝试了其它的一些网络结构，例如各类卷积神经网络等。相比于全连接神经网络，卷积神经网络在测试集上达到一定accuracy所需的epoch更少，且其参数也远小于相似性能的全连接神经网络。
+
+此外，通过查阅Fashion-MNIST相关的内容可知，引入一些类似dropout和batch normalization的技巧\upcite{fsmnistg}，对数据集进行随机翻转、旋转等数据集增广操作，也可以提高神经网络的准确率，且对训练所需的epoch数量影响不大。\upcite{meshkini2019analysis}
+
+\section{实验总结} 通过本次实验，笔者对课上讲授的神经网络的训练过程进行了实操，除了加深了理解外，对于实操中需要注意的细节也具有了深刻的认识，下面列举一些遇到的印象深刻的“坑”：
+\begin{enumerate}
+    \item 使用\lstinline{torchvision.datasets.FashionMNIST}下载数据集太慢，故改用先下载后替换的方式“骗”过PyTorch，从而成功加载数据集。
+    \item 输入数据和第一层的shape不匹配，需将输入数据reshape后传入神经网络。
+    \item 两层间的shape不匹配。
+    \item 激活函数和Loss function选择不当，导致训练几个epoch后数值变为inf或nan。
+    \item 过深的全连接神经网络因为fp32的精度问题导致梯度消失，从而无法改进accuracy。
+    \item 训练的模型或者batch过大，导致显存不足而报错。
+\end{enumerate}
+通过在实践中查阅各类资料，亲自踩坑并解决，才真正理解理论和实践之间的鸿沟，并且验证了课上讲过的理论内容的正确性。
+
+此外，通过对不同的网络结构进行各类性能的比较，一方面笔者了解到Fashion-MNIST数据集的挑战之大，另一方面也说明了目前的深度学习领域仍有较大的研究空间。此外，一些模型虽然准确率表现平庸，但是凭借其极少的参数量，或者是极小的推理所需算力，也被认为是优秀的神经网络结构，且有其在边缘计算设备上应用的价值；这也说明了对于深度学习作为一门有实践意义的具体科学，其研究不仅会追求准确率，一些其它因素也是值得我们考量的。
+
+\bibstyle{unsrt}
+\bibliography{references}{}
+
+\section*{互评}
+
+\paragraph{互评人：1950787\; 杨鑫\; 给分：100\% （8/8）} 短评：
+
+该该同学详细的汇报了在 Fashion-MNIST 数据集上复现神经网络的学习流程的过程，分别从实验原理、环境配置、数据集的准备、神经网络结构的搭建、训练与测试、性能比较以及结果分析等方面对整个实验流程做了详尽的分析和总结。体现了神经网络训练的核心过程，实验流程阐释清晰，实验总结也十分完善，我认为是一篇非常优秀的报告。
+
+
+\end{document}
